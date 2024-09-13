@@ -3,15 +3,61 @@
 import { Identifier, Literal, Node, Program, VariableDeclaration, VariableDeclarator } from 'acorn';
 import { Scope } from './Scope.js';
 
+const WindowVarMap: { [key: string]: any } = {
+  console,
+
+  setTimeout,
+  setInterval,
+
+  clearTimeout,
+  clearInterval,
+
+  encodeURI,
+  encodeURIComponent,
+  decodeURI,
+  decodeURIComponent,
+  escape,
+  unescape,
+
+  Infinity,
+  NaN,
+  isFinite,
+  isNaN,
+  parseFloat,
+  parseInt,
+  Object,
+  Boolean,
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+  Number,
+  Math,
+  Date,
+  String,
+  RegExp,
+  Array,
+  JSON,
+  Promise,
+};
+
 class Interpreter {
   scope: Scope;
   constructor() {
     this.scope = new Scope('block');
+    for (const name of Object.getOwnPropertyNames(WindowVarMap)) {
+      this.scope.const(name, WindowVarMap[name]);
+    }
   }
 
   Program(node: Program) {
     const { body } = node;
     body.forEach((ele) => {
+      console.log('===', ele);
+
       this?.[ele.type]?.(ele);
     });
   }
@@ -32,7 +78,6 @@ class Interpreter {
       const { name } = id;
       const init = this._excute(declaration?.init, declaration.init?.type);
       this.scope[kind](name, init);
-      console.log(this.scope);
 
       // this._excute(declaration, declaration.type);
     });

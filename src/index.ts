@@ -12,4 +12,4 @@ function main(code: string, _sandbox: any) {
   Interpreter.run(ast);
 }
 
-main('let a = 1;', {});
+main('let a = 1;console.log(a);', {});
