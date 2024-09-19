@@ -42,7 +42,7 @@ export class Scope {
     const _value = new ScopeVar('var', value);
     let scope: Scope | undefined = this;
 
-    while (Boolean(scope?.parent) || scope?.type !== 'function') {
+    while (Boolean(scope?.parent) && scope?.type !== 'function') {
       scope = scope?.parent;
     }
 
@@ -77,13 +77,17 @@ export class Scope {
 
   find(key: string) {
     let scope: Scope | undefined = this;
-
+    // 先找当前作用域
+    if (Object.hasOwn(scope.content, key)) {
+      return scope.content[key];
+    }
     while (scope?.parent) {
       if (Object.hasOwn(scope.content, key)) {
         return scope.content[key];
       }
       scope = scope?.parent;
     }
+
     return undefined;
   }
 }

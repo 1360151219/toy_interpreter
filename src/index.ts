@@ -7,9 +7,19 @@ const Options: acorn.Options = {
   locations: true,
 };
 
-function main(code: string, _sandbox: any) {
+function main(code: string, sandbox?: Record<string, any>) {
   const ast = acorn.parse(code, Options);
-  Interpreter.run(ast);
+  Interpreter.run(ast, sandbox);
 }
 
-main('let a = 1;console.log(a);', {});
+export default main;
+main('let a = 1;console.log(a);');
+// main(
+//   `function foo(){
+//   let a = 1;
+//   return a;
+//   }
+//   let a = foo();
+//   console.log(a)`,
+//   {}
+// );
