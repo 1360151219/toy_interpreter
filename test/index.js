@@ -1,9 +1,8 @@
+function foo() {}
+
+console.log(a, b);
 var a = 1;
 
-function foo() {
-  var a = 2;
-  let b = 2;
-  console.log(a, b);
+{
+  var b = 2;
 }
-foo();
-console.log(a);

@@ -3,14 +3,18 @@
 import {
   BlockStatement,
   CallExpression,
+  ExportDefaultDeclaration,
+  ExportNamedDeclaration,
   ExpressionStatement,
   FunctionDeclaration,
   Identifier,
   Literal,
   MemberExpression,
+  ModuleDeclaration,
   Node,
   Program,
   ReturnStatement,
+  Statement,
   VariableDeclaration,
   VariableDeclarator,
 } from 'acorn';
@@ -18,20 +22,16 @@ import { Scope, Var } from './Scope.js';
 
 const WindowVarMap: { [key: string]: any } = {
   console,
-
   setTimeout,
   setInterval,
-
   clearTimeout,
   clearInterval,
-
   encodeURI,
   encodeURIComponent,
   decodeURI,
   decodeURIComponent,
   escape,
   unescape,
-
   Infinity,
   NaN,
   isFinite,
@@ -57,10 +57,23 @@ const WindowVarMap: { [key: string]: any } = {
   Promise,
 };
 
+class Module {
+  defaultExports: Record<string, any>;
+  exports: Record<string, any>;
+  name: string;
+  constructor() {
+    this.exports = {};
+    this.defaultExports = {};
+    this.name = String(Date.now());
+  }
+}
+
 class Interpreter {
   scope: Scope;
+  module: Module;
   constructor() {
     this.scope = new Scope('block');
+    this.module = new Module();
     for (const name of Object.getOwnPropertyNames(WindowVarMap)) {
       this.scope.const(name, WindowVarMap[name]);
     }
@@ -69,9 +82,6 @@ class Interpreter {
   Program(node: Program, scope: Scope) {
     const { body } = node;
     body.forEach((ele) => {
-      // console.log('===', ele);
-      // console.log(ele);
-
       this?.[ele.type]?.(ele, scope);
     });
   }
@@ -105,14 +115,21 @@ class Interpreter {
   VariableDeclarator(_node: VariableDeclarator, scope: Scope) {}
   VariableDeclaration(node: VariableDeclaration, scope: Scope) {
     const { declarations, kind } = node;
+
+    /**
+     * 给导出语句使用
+     * @example
+     * export const a=1,b=2;
+     */
+    const resultForExportNamed: Record<string, any> = {};
     declarations.forEach((declaration) => {
       const { id } = declaration;
       const { name } = id;
       const init = this._excute(declaration?.init, scope);
       scope[kind](name, init);
-
-      // this._excute(declaration, declaration.type);
+      resultForExportNamed[name] = init;
     });
+    return resultForExportNamed;
   }
   // 声明语句--函数声明
   FunctionDeclaration(node: FunctionDeclaration, scope: Scope) {
@@ -125,6 +142,16 @@ class Interpreter {
       return body;
     };
     scope.var(id, fun);
+  }
+  // 导出语句
+  ExportDefaultDeclaration(node: ExportDefaultDeclaration, scope: Scope) {
+    this.module.defaultExports = this._excute(node.declaration, scope);
+  }
+  ExportNamedDeclaration(node: ExportNamedDeclaration, scope: Scope) {
+    const exportNamedObject = this._excute(node.declaration, scope);
+    for (const name of Object.getOwnPropertyNames(exportNamedObject)) {
+      this.module.exports[name] = exportNamedObject[name];
+    }
   }
   // 调用语句
   CallExpression(node: CallExpression, scope: Scope) {
@@ -144,6 +171,34 @@ class Interpreter {
       return object[node.property?.name];
     }
   }
+  // 预编译，实现声明提升 FunctionDeclaration、VariableDeclaration
+  _preExcute(node: Program, scope: Scope) {
+    function traverse(ele: Statement | ModuleDeclaration) {
+      const PRE_EXCUTE_NODE_LIST = ['FunctionDeclaration', 'VariableDeclaration', 'BlockStatement'];
+      const { type } = ele;
+      switch (type) {
+        case 'VariableDeclaration': {
+          const { declarations, kind } = ele;
+          if (kind === 'var') {
+            declarations.forEach((declaration) => {
+              // TODO
+              const { name } = declaration.id;
+              scope[kind](name, undefined);
+            });
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    if (node) {
+      for (const ele of node.body) {
+        traverse(ele);
+      }
+    }
+  }
   _excute(node: (Node & { type: string }) | undefined | null, scope: Scope) {
     if (!node) return;
     return this[node.type]?.(node, scope);
@@ -152,8 +207,11 @@ class Interpreter {
     for (const [key, value] of Object.entries(sandbox || {})) {
       this.scope.const(key, value);
     }
-    return this._excute(ast, this.scope);
+
+    this._preExcute(ast, this.scope);
+    this._excute(ast, this.scope);
+    return this.module;
   }
 }
 
-export default new Interpreter();
+export default Interpreter;
